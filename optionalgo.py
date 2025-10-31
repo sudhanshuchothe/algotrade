@@ -1,76 +1,115 @@
 import streamlit as st
-import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
 
-# --- Page setup ---
-st.set_page_config(page_title="ALGO Manipulation in Non-Liquid Option", layout="wide")
-st.title("🎯 ALGO Manipulation in a Non-Liquid Option Market")
+# -------------------------------
+# App Title
+# -------------------------------
+st.set_page_config(page_title="Option Manipulation Simulation", layout="centered")
+st.title("📈 Non-Liquid Option Algo Simulation (No Graph)")
+st.markdown("""
+This simulation demonstrates how an **algorithm (acting as both buyer and seller)**  
+can manipulate prices in a **non-liquid option** scenario.
 
-# --- User Inputs ---
-st.sidebar.header("Simulation Settings")
-
-fair_value = st.sidebar.number_input("Fair Value of Option", min_value=10, value=40, step=1)
-algo_bid = st.sidebar.number_input("ALGO Bid Price", min_value=1, value=20, step=1)
-algo_ask = st.sidebar.number_input("ALGO Ask Price", min_value=10, value=80, step=1)
-human_entry = st.sidebar.number_input("Human Entry Price", min_value=1, value=21, step=1)
-manipulation_margin = st.sidebar.slider("ALGO Sell Threshold (% above Fair Value)", 10, 50, 20)
-
-st.sidebar.markdown("---")
-st.sidebar.info("💡 ALGO manipulates price up to the chosen percentage above fair value, then sells to HUMAN.")
-
-# --- Simulation Logic ---
-price_history = []
-participants = []
-
-# Step 1: Initial ALGO control
-price_history.append((algo_bid + algo_ask) / 2)
-participants.append("ALGO (controls both sides)")
-
-# Step 2: Human enters at entry price
-price_history.append(human_entry)
-participants.append("HUMAN buys at " + str(human_entry))
-
-# Step 3: ALGO pushes bid up gradually
-current_price = human_entry
-while current_price < fair_value * (1 + manipulation_margin / 100):
-    current_price += 1
-    price_history.append(current_price)
-    participants.append("ALGO pushing bid up")
-
-# Step 4: ALGO sells to human at inflated price
-sell_price = fair_value * (1 + manipulation_margin / 100)
-price_history.append(sell_price)
-participants.append(f"ALGO sells at inflated price ({sell_price:.2f})")
-
-# Step 5: ALGO resets fake bid/ask
-price_history.append((algo_bid + algo_ask) / 2)
-participants.append("ALGO resets to 20/80")
-
-# --- Plotting ---
-fig, ax = plt.subplots(figsize=(10, 5))
-ax.plot(price_history, marker='o', color='blue', linewidth=2)
-
-for i, label in enumerate(participants):
-    ax.text(i, price_history[i] + 0.8, label, fontsize=8, rotation=30)
-
-ax.axhline(y=fair_value, color='green', linestyle='--', label=f'Fair Value ({fair_value})')
-ax.set_title("ALGO Manipulation Simulation in a Non-Liquid Option Market", fontsize=12)
-ax.set_xlabel("Simulation Step")
-ax.set_ylabel("Option Price")
-ax.grid(True)
-ax.legend()
-
-st.pyplot(fig)
-
-# --- Output Summary ---
-human_loss = sell_price - fair_value
-st.markdown("### 📊 Simulation Summary")
-st.write(f"""
-- **Fair Value:** {fair_value}  
-- **ALGO starts as buyer @ {algo_bid} and seller @ {algo_ask}**  
-- **Human enters @ {human_entry}**  
-- **ALGO sells at inflated price:** {sell_price:.2f}  
-- **Actual Fair Value:** {fair_value}  
-- **Human's Immediate Unrealized Loss:** {human_loss:.2f}
+**Process Overview:**
+- Algo starts as Buyer @ ₹20 and Seller @ ₹80  
+- Fair Price = ₹40  
+- Human places a Buy @ ₹21  
+- Algo reacts and moves bid to ₹22  
+- Momentum pushes price up above fair value  
+- Once 20% above fair (₹48), Algo sells at inflated price to the human  
+- Algo then resets back to ₹20/₹80 — leaving the human at a loss.
 """)
 
-st.warning("⚠️ In illiquid markets, ALGO can manipulate both bid and ask prices — retail traders often end up buying above fair value and incur losses once the ALGO resets its positions.")
+# -------------------------------
+# Sidebar Parameters
+# -------------------------------
+st.sidebar.header("🔧 Simulation Parameters")
+fair_price = st.sidebar.number_input("Fair Value of Option", 20.0, 200.0, 40.0, step=1.0)
+initial_bid = st.sidebar.number_input("Initial Algo Bid", 1.0, 200.0, 20.0, step=1.0)
+initial_ask = st.sidebar.number_input("Initial Algo Ask", 1.0, 200.0, 80.0, step=1.0)
+human_limit_buy = st.sidebar.number_input("Human Buy Order Price", 1.0, 200.0, 21.0, step=1.0)
+algo_step = st.sidebar.slider("Algo Aggressive Step", 0.5, 5.0, 1.0, 0.5)
+max_steps = st.sidebar.slider("Simulation Steps", 10, 100, 30, 5)
+
+# -------------------------------
+# Simulation Logic
+# -------------------------------
+bid = initial_bid
+ask = initial_ask
+reset_bid, reset_ask = initial_bid, initial_ask
+fair_threshold = fair_price * 1.20
+
+logs = []
+human_position = 0
+human_avg_price = None
+
+for t in range(max_steps):
+    event = ""
+    mid = (bid + ask) / 2
+    logs.append({"t": t, "bid": bid, "ask": ask, "mid": mid, "event": event})
+
+    # Step 1: Human posts buy order
+    if t == 1:
+        event += f"Human posts buy @ ₹{human_limit_buy:.2f}. "
+
+    # Step 2: Algo reacts
+    if t >= 1 and human_limit_buy > bid:
+        bid = human_limit_buy + algo_step
+        ask = max(ask, bid + 2)
+        event += f"Algo bumps bid to ₹{bid:.2f}. "
+
+    # Step 3: Random market momentum
+    if t >= 2:
+        bid += np.random.choice([0.5, 1.0, 2.0])
+        ask = max(ask, bid + np.random.choice([2.0, 3.0, 5.0]))
+        event += "Momentum buyers push price up. "
+
+    # Step 4: Price exceeds 20% above fair
+    if (bid + ask) / 2 >= fair_threshold:
+        sell_price = max(ask, fair_threshold)
+        if human_position == 0:
+            human_position = 1
+            human_avg_price = sell_price
+            event += f"Algo sells to human @ ₹{sell_price:.2f}. "
+        bid, ask = reset_bid, reset_ask
+        logs.append({
+            "t": t + 0.1,
+            "bid": bid,
+            "ask": ask,
+            "mid": (bid + ask)/2,
+            "event": f"Algo resets quotes to ₹{bid:.2f}/₹{ask:.2f}"
+        })
+        break
+
+    logs[-1]["event"] = event
+
+# -------------------------------
+# Display Results
+# -------------------------------
+df = pd.DataFrame(logs)
+df["mid"] = (df["bid"] + df["ask"]) / 2
+
+st.subheader("📜 Market Simulation Log")
+st.dataframe(df, use_container_width=True)
+
+if human_position > 0:
+    pnl = (fair_price - human_avg_price) * human_position
+    st.subheader("💰 Human Trade Summary")
+    st.write(f"**Human Buy Price:** ₹{human_avg_price:.2f}")
+    st.write(f"**Fair Value:** ₹{fair_price:.2f}")
+    st.write(f"**Unrealized P&L:** ₹{pnl:.2f} (Loss if negative)")
+else:
+    st.info("No trade executed with the human yet.")
+
+# -------------------------------
+# Download Option
+# -------------------------------
+csv = df.to_csv(index=False).encode('utf-8')
+st.download_button("⬇️ Download Simulation Log (CSV)", csv, "simulation_log.csv", "text/csv")
+
+# -------------------------------
+# Footer
+# -------------------------------
+st.markdown("---")
+st.markdown("🧠 *Educational use only — demonstrates illiquid option manipulation by algorithms.*")
