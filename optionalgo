@@ -1,54 +1,76 @@
-# Simulation of algo vs normal buyer trading in options
+import streamlit as st
+import matplotlib.pyplot as plt
 
-fair_price = 40
-algo_buyer_price = 20
-algo_seller_price = 80
-normal_buyer_order = 21
-algo_buy_after_human = 22
-price_above_fair_limit = fair_price * 1.20  # 20% above fair price
+# --- Page setup ---
+st.set_page_config(page_title="ALGO Manipulation in Non-Liquid Option", layout="wide")
+st.title("🎯 ALGO Manipulation in a Non-Liquid Option Market")
 
-# Track price progression and events
-price_timeline = []
+# --- User Inputs ---
+st.sidebar.header("Simulation Settings")
 
-# Initial prices
-price_timeline.append((algo_buyer_price, 'Algo buyer initial'))
-price_timeline.append((algo_seller_price, 'Algo seller initial'))
+fair_value = st.sidebar.number_input("Fair Value of Option", min_value=10, value=40, step=1)
+algo_bid = st.sidebar.number_input("ALGO Bid Price", min_value=1, value=20, step=1)
+algo_ask = st.sidebar.number_input("ALGO Ask Price", min_value=10, value=80, step=1)
+human_entry = st.sidebar.number_input("Human Entry Price", min_value=1, value=21, step=1)
+manipulation_margin = st.sidebar.slider("ALGO Sell Threshold (% above Fair Value)", 10, 50, 20)
 
-# Human places order at 21
-price_timeline.append((normal_buyer_order, 'Human places order at 21'))
+st.sidebar.markdown("---")
+st.sidebar.info("💡 ALGO manipulates price up to the chosen percentage above fair value, then sells to HUMAN.")
 
-# Algo buys at 22
-price_timeline.append((algo_buy_after_human, 'Algo buys at 22'))
+# --- Simulation Logic ---
+price_history = []
+participants = []
 
-# Algo pushes price towards fair price
-current_price = algo_buy_after_human
-while current_price < fair_price:
-    current_price += 5  # Increment simulation
-    price_timeline.append((current_price, 'Algo pushes price up'))
+# Step 1: Initial ALGO control
+price_history.append((algo_bid + algo_ask) / 2)
+participants.append("ALGO (controls both sides)")
 
-# Price reaches fair price
-current_price = fair_price
-price_timeline.append((current_price, 'Price reaches fair price'))
+# Step 2: Human enters at entry price
+price_history.append(human_entry)
+participants.append("HUMAN buys at " + str(human_entry))
 
-# Price goes 20% above fair price
-current_price = price_above_fair_limit
-price_timeline.append((current_price, 'Price reaches 20% above fair price'))
+# Step 3: ALGO pushes bid up gradually
+current_price = human_entry
+while current_price < fair_value * (1 + manipulation_margin / 100):
+    current_price += 1
+    price_history.append(current_price)
+    participants.append("ALGO pushing bid up")
 
-# Algo sells option to normal buyer at 20% above fair price
-algo_seller_price = int(price_above_fair_limit)
-price_timeline.append((algo_seller_price, 'Algo sells option to normal buyer at 20% above fair price'))
+# Step 4: ALGO sells to human at inflated price
+sell_price = fair_value * (1 + manipulation_margin / 100)
+price_history.append(sell_price)
+participants.append(f"ALGO sells at inflated price ({sell_price:.2f})")
 
-# Reset algo buyer and seller prices
-algo_buyer_price = 20
-algo_seller_price = 100
-price_timeline.append((algo_buyer_price, 'Algo buyer reset to 20'))
-price_timeline.append((algo_seller_price, 'Algo seller reset to 100'))
+# Step 5: ALGO resets fake bid/ask
+price_history.append((algo_bid + algo_ask) / 2)
+participants.append("ALGO resets to 20/80")
 
-# Calculate normal buyer loss
-normal_buyer_loss = algo_seller_price - normal_buyer_order
+# --- Plotting ---
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.plot(price_history, marker='o', color='blue', linewidth=2)
 
-# Print results
-for price, event in price_timeline:
-    print(f'Price: {price}, Event: {event}')
+for i, label in enumerate(participants):
+    ax.text(i, price_history[i] + 0.8, label, fontsize=8, rotation=30)
 
-print(f'\nNormal buyer loss: {normal_buyer_loss}')
+ax.axhline(y=fair_value, color='green', linestyle='--', label=f'Fair Value ({fair_value})')
+ax.set_title("ALGO Manipulation Simulation in a Non-Liquid Option Market", fontsize=12)
+ax.set_xlabel("Simulation Step")
+ax.set_ylabel("Option Price")
+ax.grid(True)
+ax.legend()
+
+st.pyplot(fig)
+
+# --- Output Summary ---
+human_loss = sell_price - fair_value
+st.markdown("### 📊 Simulation Summary")
+st.write(f"""
+- **Fair Value:** {fair_value}  
+- **ALGO starts as buyer @ {algo_bid} and seller @ {algo_ask}**  
+- **Human enters @ {human_entry}**  
+- **ALGO sells at inflated price:** {sell_price:.2f}  
+- **Actual Fair Value:** {fair_value}  
+- **Human's Immediate Unrealized Loss:** {human_loss:.2f}
+""")
+
+st.warning("⚠️ In illiquid markets, ALGO can manipulate both bid and ask prices — retail traders often end up buying above fair value and incur losses once the ALGO resets its positions.")
