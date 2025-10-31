@@ -1,0 +1,54 @@
+# Simulation of algo vs normal buyer trading in options
+
+fair_price = 40
+algo_buyer_price = 20
+algo_seller_price = 80
+normal_buyer_order = 21
+algo_buy_after_human = 22
+price_above_fair_limit = fair_price * 1.20  # 20% above fair price
+
+# Track price progression and events
+price_timeline = []
+
+# Initial prices
+price_timeline.append((algo_buyer_price, 'Algo buyer initial'))
+price_timeline.append((algo_seller_price, 'Algo seller initial'))
+
+# Human places order at 21
+price_timeline.append((normal_buyer_order, 'Human places order at 21'))
+
+# Algo buys at 22
+price_timeline.append((algo_buy_after_human, 'Algo buys at 22'))
+
+# Algo pushes price towards fair price
+current_price = algo_buy_after_human
+while current_price < fair_price:
+    current_price += 5  # Increment simulation
+    price_timeline.append((current_price, 'Algo pushes price up'))
+
+# Price reaches fair price
+current_price = fair_price
+price_timeline.append((current_price, 'Price reaches fair price'))
+
+# Price goes 20% above fair price
+current_price = price_above_fair_limit
+price_timeline.append((current_price, 'Price reaches 20% above fair price'))
+
+# Algo sells option to normal buyer at 20% above fair price
+algo_seller_price = int(price_above_fair_limit)
+price_timeline.append((algo_seller_price, 'Algo sells option to normal buyer at 20% above fair price'))
+
+# Reset algo buyer and seller prices
+algo_buyer_price = 20
+algo_seller_price = 100
+price_timeline.append((algo_buyer_price, 'Algo buyer reset to 20'))
+price_timeline.append((algo_seller_price, 'Algo seller reset to 100'))
+
+# Calculate normal buyer loss
+normal_buyer_loss = algo_seller_price - normal_buyer_order
+
+# Print results
+for price, event in price_timeline:
+    print(f'Price: {price}, Event: {event}')
+
+print(f'\nNormal buyer loss: {normal_buyer_loss}')
